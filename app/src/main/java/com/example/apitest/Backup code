@@ -1,0 +1,246 @@
+    private fun readSms() {
+
+        //var inboxUri : Uri = Uri.parse("content://sms/inbox")
+
+        val inboxUri: Uri = Telephony.Sms.Inbox.CONTENT_URI
+
+        //val sortOrder = "${Telephony.Sms._ID} DESC"
+
+        //val selection = "${Telephony.Sms._ID} > $lastMessageId"
+
+        val contentResolver: ContentResolver = contentResolver
+
+        val cursor: Cursor = contentResolver.query(inboxUri, null, null, null, null)!!
+
+        if(firstTime.equals("Yes")){
+            var i=0
+            while (cursor.moveToNext()) {
+                if(i==300){
+                    break
+                }
+                val smsSender=
+                    cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)).toString()
+                val smsBody=
+                    cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)).toString()
+                val date: String =
+                    cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)).toString()
+
+                val millisecond= date.toLong()
+
+                val smsDate = DateFormat.getDateInstance(DateFormat.SHORT, Locale.FRANCE).format(Date(millisecond)).toString()
+
+                if (smsBody.contains("A/c no", true) || smsBody.contains("A/c", true)) {
+                    if (smsBody.contains("debit", true)
+                        || smsBody.contains("debited", true)
+                        || smsBody.contains("transferred", true)
+                        || smsBody.contains("transfer", true)
+                    ) {
+
+                        val amount = getAmount(smsBody).toString()
+                        val merchant = getMerchant(smsBody,smsSender).toString()
+                        smsList.add(Sms(merchant,amount,smsDate))
+                        i++
+                    }
+                }
+
+
+            }
+        }
+//        else{
+//
+//            val editor : SharedPreferences.Editor = preferences.edit()
+//            editor.putString("FirstTimeInstall","Yes")
+//            editor.apply()
+//
+//            while (cursor.moveToNext()) {
+//                val smsSender=
+//                    cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)).toString()
+//                val smsBody=
+//                    cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)).toString()
+//                val date: String =
+//                    cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)).toString()
+//
+//                val millisecond= date.toLong()
+//
+//                val smsDate = DateFormat.getDateInstance(DateFormat.SHORT, Locale.FRANCE).format(Date(millisecond)).toString()
+//
+//                if (smsBody.contains("A/c no", true) || smsBody.contains("A/c", true)) {
+//                    if (smsBody.contains("debit", true)
+//                        || smsBody.contains("debited", true)
+//                        || smsBody.contains("transferred", true)
+//                        || smsBody.contains("transfer", true)
+//                    ) {
+//
+//                        val amount = getAmount(smsBody).toString()
+//                        val merchant = getMerchant(smsBody,smsSender).toString()
+//                        smsList.add(Sms(merchant,amount,smsDate))
+//
+//                    }
+//                }
+//
+//
+//            }
+//        }
+
+
+        cursor.close()
+
+
+        postSms()
+
+    }
+
+
+    private fun readMonthlySms() {
+
+        //var inboxUri : Uri = Uri.parse("content://sms/inbox")
+
+        val inboxUri: Uri = Telephony.Sms.Inbox.CONTENT_URI
+
+        //val sortOrder = "${Telephony.Sms._ID} DESC"
+
+        //val selection = "${Telephony.Sms._ID} > $lastMessageId"
+
+        val contentResolver: ContentResolver = contentResolver
+
+        val cursor: Cursor = contentResolver.query(inboxUri, null, null, null, null)!!
+
+        val df1: DateFormat = SimpleDateFormat("MM")
+        val df2: DateFormat = SimpleDateFormat("yyyy")
+        val date = Date()
+        val month = df1.format(date).toString()
+        val year = df2.format(date).toString()
+
+        while (cursor.moveToNext()) {
+            val smsSender=
+                cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)).toString()
+            val smsBody=
+                cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)).toString()
+            val date: String =
+                cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)).toString()
+
+            val millisecond= date.toLong()
+
+            val smsDate = DateFormat.getDateInstance(DateFormat.SHORT, Locale.FRANCE).format(Date(millisecond)).toString()
+
+            if(smsDate.substring(3,5)==month && smsDate.substring(6,10)==year){
+                if (smsBody.contains("A/c no", true) || smsBody.contains("A/c", true)) {
+                    if (smsBody.contains("debit", true)
+                        || smsBody.contains("debited", true)
+                        || smsBody.contains("transferred", true)
+                        || smsBody.contains("transfer", true)
+                    ) {
+
+                        val amount = getAmount(smsBody).toString()
+                        val merchant = getMerchant(smsBody,smsSender).toString()
+                        smsList.add(Sms(merchant,amount,smsDate))
+
+                    }
+                }
+            }
+
+
+        }
+        cursor.close()
+
+
+        postMonthlySms()
+
+    }
+
+
+    fun getAmount(body : String): String? {
+
+        // pattern - rs. **,***.**
+        val pattern1 = "(?i)(?:(?:RS|INR|MRP)\\.?\\s?)(\\d+(:?\\,\\d+)?(\\,\\d+)?(\\.\\d{1,2})?)"
+        val regex1: Pattern = Pattern.compile(pattern1)
+        // pattern - inr **,***.**
+        val pattern2 = "(?i)(?:(?:RS|INR|MRP)\\.?\\s?)(\\d+(:?\\,\\d+)?(\\,\\d+)?(\\.\\d{1,2})?)"
+        val regex2: Pattern = Pattern.compile(pattern2)
+        val matcher1: Matcher = regex1.matcher(body)
+        val matcher2: Matcher = regex2.matcher(body)
+        if (matcher1.find()) {
+            try {
+                var a: String = matcher1.group(1)
+//                a = a.replace("inr", "")
+//                a = a.replace(" ", "")
+//                a = a.replace(",", "")
+                return a
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        } else if (matcher2.find()) {
+            try {
+                // searched for rs or inr preceding number in the form of rs. **,***.**
+                var a: String = matcher2.group(1)
+//                a = a.replace("rs", "")
+//                a = a.replaceFirst(".".toRegex(), "")
+//                a = a.replace(" ", "")
+//                a = a.replace(",", "")
+                return a
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        return null
+    }
+
+
+    fun getMerchant(body: String,sender:String):String?{
+
+        if(sender.contains("AxisBk",true)){
+            val pattern1 = "(?i)(?:\\d{12}\\/)([A-Za-z0-9]*\\s?-?\\s?[A-Za-z0-9]*\\s?-?\\.?)"
+            val regex1: Pattern = Pattern.compile(pattern1)
+
+            val pattern2 = "(?i)(?:PUR\\/)([A-Za-z0-9]*\\s?-?\\s?[A-Za-z0-9]*\\s?-?\\.?)"
+            val regex2: Pattern = Pattern.compile(pattern2)
+
+            val matcher1: Matcher = regex1.matcher(body)
+            val matcher2: Matcher = regex2.matcher(body)
+            if (matcher1.find()) {
+                try {
+                    var a: String = matcher1.group(1)
+//                a = a.replace("inr", "")
+//                a = a.replace(" ", "")
+//                a = a.replace(",", "")
+                    return a
+
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            } else if (matcher2.find()) {
+                try {
+                    // searched for rs or inr preceding number in the form of rs. **,***.**
+                    var a: String = matcher2.group(1)
+//                a = a.replace("rs", "")
+//                a = a.replaceFirst(".".toRegex(), "")
+//                a = a.replace(" ", "")
+//                a = a.replace(",", "")
+                    return a
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        else if(sender.contains("SBI",true)){
+            val pattern1 = "(?i)(?:\\sto\\s)([A-Za-z0-9]*\\s?-?\\s?[A-Za-z0-9]*\\s?-?\\s?[A-Za-z0-9]*\\s?-?\\.?)(?:\\sRef\\s)"
+            val regex1: Pattern = Pattern.compile(pattern1)
+            val matcher1: Matcher = regex1.matcher(body)
+            if (matcher1.find()) {
+                try {
+                    var a: String = matcher1.group(1)
+//                a = a.replace("inr", "")
+//                a = a.replace(" ", "")
+//                a = a.replace(",", "")
+                    return a
+
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        return null
+    }
